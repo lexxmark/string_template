@@ -64,8 +64,18 @@ namespace stpl
 		template <typename V>
 		using parts_vector_t = std::vector<V>;
 
+		// std::match allocator type
+		template <typename V>
+		using match_allocator_t = std::allocator<V>;
+
 		constexpr static inline std::basic_string_view<char_t> default_arg_template = detail::default_arg_template<char_t>();
 	};
+
+	struct default_arg_template_t
+	{};
+	default_arg_template_t default_arg_template() { return {}; }
+	default_arg_template_t dat() { return {}; }
+
 
 	template<class Traits>
 	class basic_string_template
@@ -73,47 +83,91 @@ namespace stpl
 	public:
 		using char_t = typename Traits::char_t;
 		using string_view_t = std::basic_string_view<char_t>;
+		using string_t = std::basic_string<char_t>;
+		using basic_ostream_t = std::basic_ostream<char_t>;
 		using template_t = typename Traits::template_t;
 		using arg_value_t = typename Traits::arg_value_t;
 		using args_map_t = typename Traits::template args_map_t<string_view_t, arg_value_t>;
 		using part_t = std::variant<string_view_t, const arg_value_t*>;
 		using parts_vector_t = typename Traits::template parts_vector_t<part_t>;
+
+		using regex_t = std::basic_regex<char_t>;
+		using template_const_it_t = decltype(std::cbegin(template_t()));
+		using match_allocator_t = typename Traits::template match_allocator_t<std::sub_match<template_const_it_t>>;
+		using match_results_t = std::match_results<template_const_it_t, match_allocator_t>;
+
 		constexpr static inline string_view_t default_arg_template = Traits::default_arg_template;
 
-		basic_string_template(template_t template_, const std::basic_regex<char_t>& arg_template)
+		basic_string_template(template_t template_, const regex_t& arg_template)
 			: m_template(std::move(template_))
 		{
-			compile(arg_template);
+			match_results_t mr;
+			compile(arg_template, mr);
 		}
 
-		basic_string_template(template_t template_, const std::basic_regex<char_t>& arg_template, const typename args_map_t::allocator_type& m_alloc, const typename parts_vector_t::allocator_type& p_alloc)
+		basic_string_template(template_t template_, const regex_t& arg_template, const typename args_map_t::allocator_type& a_alloc, const typename parts_vector_t::allocator_type& p_alloc, const typename match_results_t::allocator_type& m_alloc)
 			: m_template(std::move(template_)),
-			m_args(m_alloc),
+			m_args(a_alloc),
 			m_parts(p_alloc)
 		{
-			compile(arg_template);
+			match_results_t mr(m_alloc);
+			compile(arg_template, mr);
+		}
+
+		template <class Alloc>
+		basic_string_template(template_t template_, const regex_t& arg_template, const Alloc& alloc)
+			: m_template(std::move(template_)),
+			m_args(alloc),
+			m_parts(alloc)
+		{
+			match_results_t mr(alloc);
+			compile(arg_template, mr);
 		}
 
 		explicit basic_string_template(template_t template_, string_view_t arg_template = default_arg_template)
 			: m_template(std::move(template_))
 		{
-			compile(std::basic_regex<char_t>(arg_template.data(), arg_template.length()));
+			match_results_t mr;
+			compile(regex_t(arg_template.data(), arg_template.length()), mr);
 		}
 
-		basic_string_template(template_t template_, string_view_t arg_template, const typename args_map_t::allocator_type& m_alloc, const typename parts_vector_t::allocator_type& p_alloc)
+		basic_string_template(template_t template_, string_view_t arg_template, const typename args_map_t::allocator_type& a_alloc, const typename parts_vector_t::allocator_type& p_alloc, const typename match_results_t::allocator_type& m_alloc)
 			: m_template(std::move(template_)),
-			m_args(m_alloc),
+			m_args(a_alloc),
 			m_parts(p_alloc)
 		{
-			compile(std::basic_regex<char_t>(arg_template.data(), arg_template.length()));
+			match_results_t mr(m_alloc);
+			compile(regex_t(arg_template.data(), arg_template.length()), mr);
 		}
 
-		basic_string_template(template_t template_, const typename args_map_t::allocator_type& m_alloc, const typename parts_vector_t::allocator_type& p_alloc)
+		template <class Alloc>
+		basic_string_template(template_t template_, string_view_t arg_template, const Alloc& alloc)
 			: m_template(std::move(template_)),
-			m_args(m_alloc),
+			m_args(alloc),
+			m_parts(alloc)
+		{
+			match_results_t mr(alloc);
+			compile(regex_t(arg_template.data(), arg_template.length()), mr);
+		}
+
+
+		basic_string_template(template_t template_, const typename args_map_t::allocator_type& a_alloc, const typename parts_vector_t::allocator_type& p_alloc, const typename match_results_t::allocator_type& m_alloc)
+			: m_template(std::move(template_)),
+			m_args(a_alloc),
 			m_parts(p_alloc)
 		{
-			compile(std::basic_regex<char_t>(default_arg_template.data(), default_arg_template.length()));
+			match_results_t mr(m_alloc);
+			compile(regex_t(default_arg_template.data(), default_arg_template.length()), mr);
+		}
+
+		template <class Alloc>
+		basic_string_template(template_t template_, default_arg_template_t, const Alloc& alloc)
+			: m_template(std::move(template_)),
+			m_args(alloc),
+			m_parts(alloc)
+		{
+			match_results_t mr(alloc);
+			compile(regex_t(default_arg_template.data(), default_arg_template.length()), mr);
 		}
 
 		arg_value_t* get_arg(string_view_t key) noexcept
@@ -144,7 +198,7 @@ namespace stpl
 
 		const auto& args() const noexcept { return m_args; }
 
-		void render(std::basic_string<char_t>& result) const
+		void render(string_t& result) const
 		{
 			for (const auto& p : m_parts)
 			{
@@ -155,14 +209,14 @@ namespace stpl
 			}
 		}
 
-		std::basic_string<char_t> render() const
+		string_t render() const
 		{
-			std::basic_string<char_t> result;
+			string_t result;
 			render(result);
 			return result;
 		}
 
-		void render(std::basic_ostream<char_t>& out) const
+		void render(basic_ostream_t& out) const
 		{
 			for (const auto& p : m_parts)
 			{
@@ -174,9 +228,9 @@ namespace stpl
 		}
 
 	private:
-		void compile(const std::basic_regex<char_t>& arg_template)
+		void compile(const regex_t& arg_template, match_results_t& match)
 		{
-			std::match_results<typename template_t::const_iterator> match;
+			//std::match_results<typename template_t::const_iterator> match;
 			auto b = std::cbegin(m_template);
 			auto e = std::cend(m_template);
 
@@ -232,6 +286,10 @@ namespace stpl
 			// container type for parts vector
 			template <typename V>
 			using parts_vector_t = std::pmr::vector<V>;
+
+			// std::match allocator type
+			template <typename V>
+			using match_allocator_t = std::pmr::polymorphic_allocator<V>;
 		};
 
 		using string_template = basic_string_template<pmr_string_template_traits<char>>;

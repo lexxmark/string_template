@@ -75,10 +75,21 @@ int main()
 
         // std::pmr version
         {
-            std::array<char, 512> buff;
+            std::array<char, 1024> buff;
             std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
 
-            pmr::string_template st("Hello {{name}}!", &mem, &mem);
+            pmr::string_template st("Hello {{name}}!", &mem, &mem, &mem);
+            st.set_arg("name", "World");
+            auto r = st.render();
+            EXPECT(r, "Hello World!");
+        }
+
+        // std::pmr version with single allocator
+        {
+            std::array<char, 1024> buff;
+            std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
+
+            pmr::string_template st("Hello {{name}}!", stpl::dat(), &mem);
             st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -102,10 +113,21 @@ int main()
 
         // std::pmr non-owning version
         {
-            std::array<char, 512> buff;
+            std::array<char, 1024> buff;
             std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
 
-            basic_string_template<my_pmr_non_owning_traits> st("Hello {{name}}!", &mem, &mem);
+            basic_string_template<my_pmr_non_owning_traits> st("Hello {{name}}!", &mem, &mem, &mem);
+            st.set_arg("name", "World");
+            auto r = st.render();
+            EXPECT(r, "Hello World!");
+        }
+
+        // std::pmr non-owning version with single allocator
+        {
+            std::array<char, 1024> buff;
+            std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
+
+            basic_string_template<my_pmr_non_owning_traits> st("Hello {{name}}!", stpl::dat(), &mem);
             st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
