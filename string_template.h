@@ -189,11 +189,11 @@ namespace stpl
 			return false;
 		}
 
-		template<typename Pred>
-		void set_args(const Pred pred)
+		template<typename Visitor>
+		void set_args(const Visitor vis)
 		{
 			for (auto& [k, v] : m_args)
-				pred(k, v);
+				vis(k, v);
 		}
 
 		const auto& args() const noexcept { return m_args; }

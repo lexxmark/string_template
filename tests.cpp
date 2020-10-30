@@ -57,7 +57,7 @@ int main()
             EXPECT(r, L"Hello World!");
         }
 
-        // custom substitution template {name}->name
+        // custom argument template {name}->name
         {
             string_template st("Hello {name}!", R"(\{([^\}]+)\})");
             st.set_arg("name", "World");
@@ -65,7 +65,7 @@ int main()
             EXPECT(r, "Hello World!");
         }
 
-        // custom substitution template {name}->{name}
+        // custom argument template {name}->{name}
         {
             string_template st("Hello {name}!", R"(\{[^\}]+\})");
             st.set_arg("{name}", "World");
@@ -133,7 +133,7 @@ int main()
             EXPECT(r, "Hello World!");
         }
 
-        // multiple substitutions
+        // multiple arguments
         {
             string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
             st.set_arg("name1", "World");
@@ -142,14 +142,14 @@ int main()
             EXPECT(r, "Hello World!Hello Space!Hello World!");
         }
 
-        // multiple substitutions using predicate
+        // multiple arguments using predicate
         {
             string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
-            st.set_args([](auto& k, auto&v) {
-                if (k == "name1")
-                    v = "World";
-                else if (k == "name2")
-                    v = "Space";
+            st.set_args([](auto& name, auto& value) {
+                if (name == "name1")
+                    value = "World";
+                else if (name == "name2")
+                    value = "Space";
             });
             auto r = st.render();
             EXPECT(r, "Hello World!Hello Space!Hello World!");
