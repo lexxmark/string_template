@@ -171,7 +171,7 @@ namespace stpl
 			compile(regex_t(default_arg_template.data(), default_arg_template.length()), mr);
 		}
 
-		arg_value_t* get_arg(string_view_t key) noexcept
+		arg_value_t* get_arg(string_view_t key)
 		{
 			if (auto it = m_args.find(key); it != m_args.end())
 			{
@@ -235,18 +235,24 @@ namespace stpl
 		{
 			for (const auto& p : m_parts)
 			{
+				// if part is a piece of template
 				if (p.index() == 0)
 					result += std::get<0>(p);
 				else
 				{
+					// part is argument value or piece of template
 					const auto& arg_value = *std::get<1>(p);
+					// if argument value uninitialized -> get piece of template
 					if (arg_value.index() == 0)
 						result += std::get<0>(arg_value);
 					else
 					{
+						// argument value is initialized
+						// if argument value is callable -> invoke with no arguments
 						if constexpr (std::is_invocable_v<arg_value_t>)
 							result += std::get<1>(arg_value)();
 						else
+							// argument value is orginary value
 							result += std::get<1>(arg_value);
 					}
 				}
@@ -264,18 +270,24 @@ namespace stpl
 		{
 			for (const auto& p : m_parts)
 			{
+				// if part is a piece of template
 				if (p.index() == 0)
 					out << std::get<0>(p);
 				else
 				{
+					// part is argument value or piece of template
 					const auto& arg_value = *std::get<1>(p);
+					// if argument value uninitialized -> get piece of template
 					if (arg_value.index() == 0)
 						out << std::get<0>(arg_value);
 					else
 					{
+						// argument value is initialized
+						// if argument value is callable -> invoke with no arguments
 						if constexpr (std::is_invocable_v<arg_value_t>)
 							out << std::get<1>(arg_value)();
 						else
+							// argument value is orginary value
 							out << std::get<1>(arg_value);
 					}
 				}
