@@ -53,7 +53,15 @@ It's possible to supply visitor to process all arguments:
 	EXPECT(r, "Hello World!Hello Space!Hello World!");
 ```
 
-There is a stream version of *render* function:
+Arguments with uninitialized values remain unchanged:
+```
+	string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
+	st.set_arg("name2", "Space");
+	auto r = st.render();
+	EXPECT(r, "Hello {{name1}}!Hello Space!Hello {{name1}}!");
+```
+
+There is a stream version of the *render* function:
 ```
 	string_template st("Hello {{name}}!");
 	st.set_arg("name", "World");
@@ -61,6 +69,20 @@ There is a stream version of *render* function:
 	std::stringstream str;
 	st.render(str);
 	EXPECT(str.str(), "Hello World!");
+```
+
+User can use functions for argument values:
+```
+	struct my_callback_traits : stpl::string_template_traits<char>
+	{
+		using arg_value_t = std::function<std::string_view()>;
+	};
+
+	using namespace std::literals;
+	basic_string_template<my_callback_traits> st("Hello {{name}}!");
+	st.set_arg("name", [] { return "World"sv; });
+	auto r = st.render();
+	EXPECT(r, "Hello World!");
 ```
 
 More usage examples see in tests.cpp file.

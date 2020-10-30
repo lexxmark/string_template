@@ -87,8 +87,9 @@ namespace stpl
 		using basic_ostream_t = std::basic_ostream<char_t>;
 		using template_t = typename Traits::template_t;
 		using arg_value_t = typename Traits::arg_value_t;
-		using args_map_t = typename Traits::template args_map_t<string_view_t, arg_value_t>;
-		using part_t = std::variant<string_view_t, const arg_value_t*>;
+		using arg_store_value_t = std::variant<string_view_t, arg_value_t>;
+		using args_map_t = typename Traits::template args_map_t<string_view_t, arg_store_value_t>;
+		using part_t = std::variant<string_view_t, const arg_store_value_t*>;
 		using parts_vector_t = typename Traits::template parts_vector_t<part_t>;
 
 		using regex_t = std::basic_regex<char_t>;
@@ -173,16 +174,33 @@ namespace stpl
 		arg_value_t* get_arg(string_view_t key) noexcept
 		{
 			if (auto it = m_args.find(key); it != m_args.end())
-				return &it->second;
+			{
+				auto& v = it->second;
+				if (v.index() == 0)
+					v.emplace<1>();
+				return &std::get<1>(v);
+			}
 			else
 				return nullptr;
 		}
 
 		bool set_arg(string_view_t key, arg_value_t value)
 		{
-			if (auto arg = get_arg(key))
+			if (auto it = m_args.find(key); it != m_args.end())
 			{
-				*arg = std::move(value);
+				it->second.emplace<1>(std::move(value));
+				return true;
+			}
+
+			return false;
+		}
+
+		template<class... Args>
+		bool emplace_arg(string_view_t key, Args&&... args)
+		{
+			if (auto it = m_args.find(key); it != m_args.end())
+			{
+				it->second.emplace<1>(std::forward<Args>(args)...);
 				return true;
 			}
 
@@ -193,7 +211,22 @@ namespace stpl
 		void set_args(const Visitor vis)
 		{
 			for (auto& [k, v] : m_args)
-				vis(k, v);
+			{
+				if (v.index() == 0)
+					v.emplace<1>();
+				vis(k, std::get<1>(v));
+			}
+		}
+
+		template<typename Visitor>
+		void set_args_if(const Visitor vis)
+		{
+			for (auto& [k, v] : m_args)
+			{
+				arg_value_t value;
+				if (vis(k, value))
+					v.emplace<1>(std::move(value));
+			}
 		}
 
 		const auto& args() const noexcept { return m_args; }
@@ -205,7 +238,18 @@ namespace stpl
 				if (p.index() == 0)
 					result += std::get<0>(p);
 				else
-					result += *std::get<1>(p);
+				{
+					const auto& arg_value = *std::get<1>(p);
+					if (arg_value.index() == 0)
+						result += std::get<0>(arg_value);
+					else
+					{
+						if constexpr (std::is_invocable_v<arg_value_t>)
+							result += std::get<1>(arg_value)();
+						else
+							result += std::get<1>(arg_value);
+					}
+				}
 			}
 		}
 
@@ -223,23 +267,30 @@ namespace stpl
 				if (p.index() == 0)
 					out << std::get<0>(p);
 				else
-					out << *std::get<1>(p);
+				{
+					const auto& arg_value = *std::get<1>(p);
+					if (arg_value.index() == 0)
+						out << std::get<0>(arg_value);
+					else
+					{
+						if constexpr (std::is_invocable_v<arg_value_t>)
+							out << std::get<1>(arg_value)();
+						else
+							out << std::get<1>(arg_value);
+					}
+				}
 			}
 		}
 
 	private:
 		void compile(const regex_t& arg_template, match_results_t& match)
 		{
-			//std::match_results<typename template_t::const_iterator> match;
 			auto b = std::cbegin(m_template);
 			auto e = std::cend(m_template);
 
 			// search arguments using arg_template
 			while (std::regex_search(b, e, match, arg_template))
 			{
-				if (match.empty())
-					break;
-
 				// save unmatched prefix to m_parts
 				string_view_t prefix(&*match.prefix().first, match.prefix().length());
 				m_parts.push_back(prefix);
@@ -249,10 +300,12 @@ namespace stpl
 					i = 1;
 
 				// save matched argument name to m_args
+				// by default argument value is a full argument name
+				string_view_t arg_name(&*match[i].first, match[i].length());
+				auto res = m_args.try_emplace(arg_name, std::in_place_index<0>, &*match[0].first, match[0].length());
+
 				// and save const ptr to argument value to m_parts
-				string_view_t s(&*match[i].first, match[i].length());
-				const auto& arg_value = m_args[s];
-				m_parts.push_back(&arg_value);
+				m_parts.push_back(&res.first->second);
 
 				// move to next un-searched symbol
 				b = match[0].second;

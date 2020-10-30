@@ -19,6 +19,7 @@
 #include <memory_resource>
 #include <array>
 #include <sstream>
+#include <functional>
 
 #define EXPECT_M(a, b, s) do { if ((a) != (b)) throw std::logic_error(s); } while(false)
 #define EXPECT(a, b) EXPECT_M(a, b, "Test failed.")
@@ -33,6 +34,11 @@ struct my_pmr_non_owning_traits : stpl::pmr::pmr_string_template_traits<char>
 {
     using template_t = std::string_view;
     using arg_value_t = std::string_view;
+};
+
+struct my_callback_traits : stpl::string_template_traits<char>
+{
+    using arg_value_t = std::function<std::string_view()>;
 };
 
 int main()
@@ -55,6 +61,23 @@ int main()
             st.set_arg(L"name", L"World");
             auto r = st.render();
             EXPECT(r, L"Hello World!");
+        }
+
+        // get_arg
+        {
+            string_template st("Hello {{name}}!");
+            if (auto arg = st.get_arg("name"))
+                *arg = "World";
+            auto r = st.render();
+            EXPECT(r, "Hello World!");
+        }
+
+        // emplace_arg
+        {
+            string_template st("Hello {{name}}!");
+            st.emplace_arg("name", "World");
+            auto r = st.render();
+            EXPECT(r, "Hello World!");
         }
 
         // custom argument template {name}->name
@@ -142,7 +165,7 @@ int main()
             EXPECT(r, "Hello World!Hello Space!Hello World!");
         }
 
-        // multiple arguments using predicate
+        // multiple arguments using visitor
         {
             string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
             st.set_args([](auto& name, auto& value) {
@@ -163,6 +186,38 @@ int main()
             std::stringstream str;
             st.render(str);
             EXPECT(str.str(), "Hello World!");
+        }
+
+        // argument values as callbacks
+        {
+            using namespace std::literals;
+            basic_string_template<my_callback_traits> st("Hello {{name}}!");
+            st.set_arg("name", [] { return "World"sv; });
+            auto r = st.render();
+            EXPECT(r, "Hello World!");
+        }
+
+        // partial arguments
+        {
+            string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
+            st.set_arg("name2", "Space");
+            auto r = st.render();
+            EXPECT(r, "Hello {{name1}}!Hello Space!Hello {{name1}}!");
+        }
+
+        // partial arguments using visitor 
+        {
+            string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
+            st.set_args_if([](auto& name, auto& value) {
+                if (name == "name2")
+                {
+                    value = "Space";
+                    return true;
+                }
+                return false;
+            });
+            auto r = st.render();
+            EXPECT(r, "Hello {{name1}}!Hello Space!Hello {{name1}}!");
         }
     }
     catch (const std::logic_error& e)
