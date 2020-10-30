@@ -28,6 +28,24 @@
 
 namespace stpl
 {
+	namespace detail
+	{
+		template<typename CharT>
+		constexpr std::basic_string_view<CharT> default_arg_template();
+
+		template<>
+		constexpr std::string_view default_arg_template<char>()
+		{
+			return R"(\{\{([^\}]+)\}\})";
+		}
+
+		template<>
+		constexpr std::wstring_view default_arg_template<wchar_t>()
+		{
+			return LR"(\{\{([^\}]+)\}\})";
+		}
+	}
+
 	template <typename CharT>
 	struct string_template_traits
 	{
@@ -35,16 +53,18 @@ namespace stpl
 		using char_t = CharT;
 		// type to store template string
 		using template_t = std::basic_string<char_t>;
-		// type to store substitution value
-		using subst_value_t = std::basic_string<char_t>;
+		// type to store argument value
+		using arg_value_t = std::basic_string<char_t>;
 
-		// container type for substition map
+		// container type for argument map
 		template <typename K, typename V>
-		using subst_map_t = std::map<K, V>;
+		using args_map_t = std::map<K, V>;
 
 		// container type for parts vector
 		template <typename V>
 		using parts_vector_t = std::vector<V>;
+
+		constexpr static inline std::basic_string_view<char_t> default_arg_template = detail::default_arg_template<char_t>();
 	};
 
 	template<class Traits>
@@ -54,61 +74,61 @@ namespace stpl
 		using char_t = typename Traits::char_t;
 		using string_view_t = std::basic_string_view<char_t>;
 		using template_t = typename Traits::template_t;
-		using subst_value_t = typename Traits::subst_value_t;
-		using subst_map_t = typename Traits::template subst_map_t<string_view_t, subst_value_t>;
-		using part_t = std::variant<string_view_t, std::reference_wrapper<const subst_value_t>>;
+		using arg_value_t = typename Traits::arg_value_t;
+		using args_map_t = typename Traits::template args_map_t<string_view_t, arg_value_t>;
+		using part_t = std::variant<string_view_t, const arg_value_t*>;
 		using parts_vector_t = typename Traits::template parts_vector_t<part_t>;
+		constexpr static inline string_view_t default_arg_template = Traits::default_arg_template;
 
-		basic_string_template(template_t template_, const std::basic_regex<char_t>& subst_template)
+		basic_string_template(template_t template_, const std::basic_regex<char_t>& arg_template)
 			: m_template(std::move(template_))
 		{
-			compile(subst_template);
+			compile(arg_template);
 		}
 
-		basic_string_template(template_t template_, const std::basic_regex<char_t>& subst_template, const typename subst_map_t::allocator_type& m_alloc, const typename parts_vector_t::allocator_type& p_alloc)
+		basic_string_template(template_t template_, const std::basic_regex<char_t>& arg_template, const typename args_map_t::allocator_type& m_alloc, const typename parts_vector_t::allocator_type& p_alloc)
 			: m_template(std::move(template_)),
-			m_substs(m_alloc),
+			m_args(m_alloc),
 			m_parts(p_alloc)
 		{
-			compile(std::basic_regex<char_t>(subst_template));
+			compile(arg_template);
 		}
 
-		explicit basic_string_template(template_t template_, string_view_t subst_template = default_subst_template<char_t>())
+		explicit basic_string_template(template_t template_, string_view_t arg_template = default_arg_template)
 			: m_template(std::move(template_))
 		{
-			compile(std::basic_regex<char_t>(subst_template.data(), subst_template.length()));
+			compile(std::basic_regex<char_t>(arg_template.data(), arg_template.length()));
 		}
 
-		basic_string_template(template_t template_, string_view_t subst_template, const typename subst_map_t::allocator_type& m_alloc, const typename parts_vector_t::allocator_type& p_alloc)
+		basic_string_template(template_t template_, string_view_t arg_template, const typename args_map_t::allocator_type& m_alloc, const typename parts_vector_t::allocator_type& p_alloc)
 			: m_template(std::move(template_)),
-			m_substs(m_alloc),
+			m_args(m_alloc),
 			m_parts(p_alloc)
 		{
-			compile(std::basic_regex<char_t>(subst_template.data(), subst_template.length()));
+			compile(std::basic_regex<char_t>(arg_template.data(), arg_template.length()));
 		}
 
-		basic_string_template(template_t template_, const typename subst_map_t::allocator_type& m_alloc, const typename parts_vector_t::allocator_type& p_alloc)
+		basic_string_template(template_t template_, const typename args_map_t::allocator_type& m_alloc, const typename parts_vector_t::allocator_type& p_alloc)
 			: m_template(std::move(template_)),
-			m_substs(m_alloc),
+			m_args(m_alloc),
 			m_parts(p_alloc)
 		{
-			auto subst_template = default_subst_template<char_t>();
-			compile(std::basic_regex<char_t>(subst_template.data(), subst_template.length()));
+			compile(std::basic_regex<char_t>(default_arg_template.data(), default_arg_template.length()));
 		}
 
-		subst_value_t* get_subst(string_view_t key) noexcept
+		arg_value_t* get_arg(string_view_t key) noexcept
 		{
-			if (auto it = m_substs.find(key); it != m_substs.end())
+			if (auto it = m_args.find(key); it != m_args.end())
 				return &it->second;
 			else
 				return nullptr;
 		}
 
-		bool set_subst(string_view_t key, subst_value_t value)
+		bool set_arg(string_view_t key, arg_value_t value)
 		{
-			if (auto subst = get_subst(key))
+			if (auto arg = get_arg(key))
 			{
-				*subst = std::move(value);
+				*arg = std::move(value);
 				return true;
 			}
 
@@ -116,13 +136,13 @@ namespace stpl
 		}
 
 		template<typename Pred>
-		void set_substs(const Pred pred)
+		void set_args(const Pred pred)
 		{
-			for (auto& [k, v] : m_substs)
+			for (auto& [k, v] : m_args)
 				pred(k, v);
 		}
 
-		const auto& substs() const noexcept { return m_substs; }
+		const auto& args() const noexcept { return m_args; }
 
 		void render(std::basic_string<char_t>& result) const
 		{
@@ -131,7 +151,7 @@ namespace stpl
 				if (p.index() == 0)
 					result += std::get<0>(p);
 				else
-					result += std::get<1>(p).get();
+					result += *std::get<1>(p);
 			}
 		}
 
@@ -149,19 +169,19 @@ namespace stpl
 				if (p.index() == 0)
 					out << std::get<0>(p);
 				else
-					out << std::get<1>(p).get();
+					out << *std::get<1>(p);
 			}
 		}
 
 	private:
-		void compile(const std::basic_regex<char_t>& subst_template)
+		void compile(const std::basic_regex<char_t>& arg_template)
 		{
 			std::match_results<typename template_t::const_iterator> match;
 			auto b = std::cbegin(m_template);
 			auto e = std::cend(m_template);
 
-			// search substitutions using subst_template
-			while (std::regex_search(b, e, match, subst_template))
+			// search arguments using arg_template
+			while (std::regex_search(b, e, match, arg_template))
 			{
 				if (match.empty())
 					break;
@@ -174,12 +194,13 @@ namespace stpl
 				if (match.size() == 2)
 					i = 1;
 
-				// save matched substitution name to m_substs
-				// and save const ref to substitution value to m_parts
+				// save matched argument name to m_args
+				// and save const ptr to argument value to m_parts
 				string_view_t s(&*match[i].first, match[i].length());
-				m_parts.push_back(std::cref(m_substs[s]));
+				const auto& arg_value = m_args[s];
+				m_parts.push_back(&arg_value);
 
-				// move to first un-searched symbol
+				// move to next un-searched symbol
 				b = match[0].second;
 			}
 
@@ -191,23 +212,8 @@ namespace stpl
 			}
 		}
 
-		template<typename CharT>
-		static std::basic_string_view<CharT> default_subst_template();
-
-		template<>
-		static std::string_view default_subst_template<char>()
-		{
-			return R"(\{\{([^\}]+)\}\})";
-		}
-
-		template<>
-		static std::wstring_view default_subst_template<wchar_t>()
-		{
-			return LR"(\{\{([^\}]+)\}\})";
-		}
-
 		template_t m_template;
-		subst_map_t m_substs;
+		args_map_t m_args;
 		parts_vector_t m_parts;
 	};
 
@@ -219,9 +225,9 @@ namespace stpl
 		template <typename CharT>
 		struct pmr_string_template_traits : public string_template_traits<CharT>
 		{
-			// container type for substition map
+			// container type for arguments map
 			template <typename K, typename V>
-			using subst_map_t = std::pmr::map<K, V>;
+			using args_map_t = std::pmr::map<K, V>;
 
 			// container type for parts vector
 			template <typename V>

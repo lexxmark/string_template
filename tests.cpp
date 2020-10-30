@@ -26,13 +26,13 @@
 struct my_non_owning_traits : stpl::string_template_traits<char>
 {
     using template_t = std::string_view;
-    using subst_value_t = std::string_view;
+    using arg_value_t = std::string_view;
 };
 
 struct my_pmr_non_owning_traits : stpl::pmr::pmr_string_template_traits<char>
 {
     using template_t = std::string_view;
-    using subst_value_t = std::string_view;
+    using arg_value_t = std::string_view;
 };
 
 int main()
@@ -44,7 +44,7 @@ int main()
         // std::string version
         {
             string_template st("Hello {{name}}!");
-            st.set_subst("name", "World");
+            st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
         }
@@ -52,7 +52,7 @@ int main()
         // std::wstring version
         {
             wstring_template st(L"Hello {{name}}!");
-            st.set_subst(L"name", L"World");
+            st.set_arg(L"name", L"World");
             auto r = st.render();
             EXPECT(r, L"Hello World!");
         }
@@ -60,7 +60,7 @@ int main()
         // custom substitution template {name}->name
         {
             string_template st("Hello {name}!", R"(\{([^\}]+)\})");
-            st.set_subst("name", "World");
+            st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
         }
@@ -68,7 +68,7 @@ int main()
         // custom substitution template {name}->{name}
         {
             string_template st("Hello {name}!", R"(\{[^\}]+\})");
-            st.set_subst("{name}", "World");
+            st.set_arg("{name}", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
         }
@@ -79,7 +79,7 @@ int main()
             std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
 
             pmr::string_template st("Hello {{name}}!", &mem, &mem);
-            st.set_subst("name", "World");
+            st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
         }
@@ -89,13 +89,13 @@ int main()
             string_template st("Hello World!");
             auto r = st.render();
             EXPECT(r, "Hello World!");
-            EXPECT(st.substs().empty(), true);
+            EXPECT(st.args().empty(), true);
         }
 
         // non-owning version
         {
             basic_string_template<my_non_owning_traits> st("Hello {{name}}!");
-            st.set_subst("name", "World");
+            st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
         }
@@ -106,7 +106,7 @@ int main()
             std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
 
             basic_string_template<my_pmr_non_owning_traits> st("Hello {{name}}!", &mem, &mem);
-            st.set_subst("name", "World");
+            st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
         }
@@ -114,8 +114,8 @@ int main()
         // multiple substitutions
         {
             string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
-            st.set_subst("name1", "World");
-            st.set_subst("name2", "Space");
+            st.set_arg("name1", "World");
+            st.set_arg("name2", "Space");
             auto r = st.render();
             EXPECT(r, "Hello World!Hello Space!Hello World!");
         }
@@ -123,7 +123,7 @@ int main()
         // multiple substitutions using predicate
         {
             string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
-            st.set_substs([](auto& k, auto&v) {
+            st.set_args([](auto& k, auto&v) {
                 if (k == "name1")
                     v = "World";
                 else if (k == "name2")
@@ -136,7 +136,7 @@ int main()
         // stream version
         {
             string_template st("Hello {{name}}!");
-            st.set_subst("name", "World");
+            st.set_arg("name", "World");
 
             std::stringstream str;
             st.render(str);
