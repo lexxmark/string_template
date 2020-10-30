@@ -158,16 +158,16 @@ int main()
 
         // multiple arguments
         {
-            string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
+            string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_arg("name1", "World");
             st.set_arg("name2", "Space");
             auto r = st.render();
-            EXPECT(r, "Hello World!Hello Space!Hello World!");
+            EXPECT(r, "Hello World! Hello Space! Hello World!");
         }
 
         // multiple arguments using visitor
         {
-            string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
+            string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_args([](auto& name, auto& value) {
                 if (name == "name1")
                     value = "World";
@@ -175,7 +175,7 @@ int main()
                     value = "Space";
             });
             auto r = st.render();
-            EXPECT(r, "Hello World!Hello Space!Hello World!");
+            EXPECT(r, "Hello World! Hello Space! Hello World!");
         }
 
         // stream version
@@ -199,15 +199,15 @@ int main()
 
         // partial arguments
         {
-            string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
+            string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_arg("name2", "Space");
             auto r = st.render();
-            EXPECT(r, "Hello {{name1}}!Hello Space!Hello {{name1}}!");
+            EXPECT(r, "Hello {{name1}}! Hello Space! Hello {{name1}}!");
         }
 
         // partial arguments using visitor 
         {
-            string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
+            string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_args_if([](auto& name, auto& value) {
                 if (name == "name2")
                 {
@@ -217,7 +217,7 @@ int main()
                 return false;
             });
             auto r = st.render();
-            EXPECT(r, "Hello {{name1}}!Hello Space!Hello {{name1}}!");
+            EXPECT(r, "Hello {{name1}}! Hello Space! Hello {{name1}}!");
         }
     }
     catch (const std::logic_error& e)

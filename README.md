@@ -40,9 +40,9 @@ Or single allocator can be used:
 	EXPECT(r, "Hello World!");
 ```
 
-It's possible to supply visitor to process all arguments:
+It's possible to supply a visitor to process all arguments:
 ```
-	string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
+	string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
 	st.set_args([](auto& name, auto& value) {
 		if (name == "name1")
 			value = "World";
@@ -50,15 +50,15 @@ It's possible to supply visitor to process all arguments:
 			value = "Space";
 	});
 	auto r = st.render();
-	EXPECT(r, "Hello World!Hello Space!Hello World!");
+	EXPECT(r, "Hello World! Hello Space! Hello World!");
 ```
 
 Arguments with uninitialized values remain unchanged:
 ```
-	string_template st("Hello {{name1}}!Hello {{name2}}!Hello {{name1}}!");
+	string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
 	st.set_arg("name2", "Space");
 	auto r = st.render();
-	EXPECT(r, "Hello {{name1}}!Hello Space!Hello {{name1}}!");
+	EXPECT(r, "Hello {{name1}}! Hello Space! Hello {{name1}}!");
 ```
 
 There is a stream version of the *render* function:
