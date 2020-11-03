@@ -345,7 +345,7 @@ namespace stpl
 	using string_template = basic_string_template<string_template_traits<char>>;
 	using wstring_template = basic_string_template<string_template_traits<wchar_t>>;
 
-	template <class StringTemplate>
+	template <class StringTemplate = string_template>
 	StringTemplate make_template(typename StringTemplate::string_view_t str_template)
 	{
 		StringTemplate st;
@@ -353,7 +353,7 @@ namespace stpl
 		return st;
 	}
 
-	template <class StringTemplate>
+	template <class StringTemplate = string_template>
 	StringTemplate make_template(typename StringTemplate::string_view_t str_template, typename StringTemplate::string_view_t arg_regex)
 	{
 		StringTemplate st;

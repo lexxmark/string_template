@@ -52,7 +52,7 @@ int main()
     {
         // std::string version
         {
-            auto st = make_template<string_template>("Hello {{name}}!");
+            auto st = make_template("Hello {{name}}!");
             st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -68,7 +68,7 @@ int main()
 
         // get_arg
         {
-            auto st = make_template<string_template>("Hello {{name}}!");
+            auto st = make_template("Hello {{name}}!");
             if (auto arg = st.get_arg("name"))
                 *arg = "World";
             auto r = st.render();
@@ -77,7 +77,7 @@ int main()
 
         // emplace_arg
         {
-            auto st = make_template<string_template>("Hello {{name}}!");
+            auto st = make_template("Hello {{name}}!");
             st.emplace_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -85,7 +85,7 @@ int main()
 
         // custom argument template {name}->name
         {
-            auto st = make_template<string_template>("Hello {name}!", R"(\{([^\}]+)\})");
+            auto st = make_template("Hello {name}!", R"(\{([^\}]+)\})");
             st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -93,7 +93,7 @@ int main()
 
         // custom argument template {name}->{name}
         {
-            auto st = make_template<string_template>("Hello {name}!", R"(\{[^\}]+\})");
+            auto st = make_template("Hello {name}!", R"(\{[^\}]+\})");
             st.set_arg("{name}", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -124,7 +124,7 @@ int main()
 
         // empty
         {
-            auto st = make_template<string_template>("Hello World!");
+            auto st = make_template("Hello World!");
             auto r = st.render();
             EXPECT(r, "Hello World!");
             EXPECT(st.args().empty(), true);
@@ -163,7 +163,7 @@ int main()
 
         // multiple arguments
         {
-            auto st = make_template<string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+            auto st = make_template("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_arg("name1", "World");
             st.set_arg("name2", "Space");
             auto r = st.render();
@@ -172,7 +172,7 @@ int main()
 
         // multiple arguments using visitor
         {
-            auto st = make_template<string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+            auto st = make_template("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_args([](auto& name, auto& value) {
                 if (name == "name1")
                     value = "World";
@@ -185,7 +185,7 @@ int main()
 
         // stream version
         {
-            auto st = make_template<string_template>("Hello {{name}}!");
+            auto st = make_template("Hello {{name}}!");
             st.set_arg("name", "World");
 
             std::stringstream str;
@@ -205,7 +205,7 @@ int main()
 
         // partial arguments
         {
-            auto st = make_template<string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+            auto st = make_template("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_arg("name2", "Space");
             auto r = st.render();
             EXPECT(r, "Hello {{name1}}! Hello Space! Hello {{name1}}!");
@@ -213,7 +213,7 @@ int main()
 
         // partial arguments using visitor 
         {
-            auto st = make_template<string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+            auto st = make_template("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_args_if([](auto& name, auto& value) {
                 if (name == "name2")
                 {

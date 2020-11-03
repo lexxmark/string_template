@@ -4,7 +4,7 @@ This is one header library defines *basic_string_template* template class with *
 
 Simple use:
 ```
-	auto st = stpl::make_template<stpl::string_template>("Hello {{name}}!");
+	auto st = stpl::make_template("Hello {{name}}!");
 	st.set_arg("name", "World");
 	auto r = st.render();
 	EXPECT(r, "Hello World!");
@@ -12,7 +12,7 @@ Simple use:
 
 User can define custom argument regexp to use different argument wrapping. In the example below arguments will be captured by single *{...}* braces:
 ```
-	auto st = stpl::make_template<stpl::string_template>("Hello {name}!", R"(\{([^\}]+)\})");
+	auto st = stpl::make_template("Hello {name}!", R"(\{([^\}]+)\})");
 	st.set_arg("name", "World");
 	auto r = st.render();
 	EXPECT(r, "Hello World!");
@@ -43,7 +43,7 @@ Or single allocator can be used:
 
 It's possible to supply a visitor to process all arguments:
 ```
-	auto st = stpl::make_template<stpl::string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+	auto st = stpl::make_template("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
 	st.set_args([](auto& name, auto& value) {
 		if (name == "name1")
 			value = "World";
@@ -56,7 +56,7 @@ It's possible to supply a visitor to process all arguments:
 
 Arguments with uninitialized values remain unchanged:
 ```
-	auto st = stpl::make_template<stpl::string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+	auto st = stpl::make_template("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
 	st.set_arg("name2", "Space");
 	auto r = st.render();
 	EXPECT(r, "Hello {{name1}}! Hello Space! Hello {{name1}}!");
@@ -64,7 +64,7 @@ Arguments with uninitialized values remain unchanged:
 
 There is a stream version of the *render* function:
 ```
-	auto st = stpl::make_template<stpl::string_template>("Hello {{name}}!");
+	auto st = stpl::make_template("Hello {{name}}!");
 	st.set_arg("name", "World");
 
 	std::stringstream str;
