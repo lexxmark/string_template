@@ -31,16 +31,16 @@ namespace stpl
 	namespace detail
 	{
 		template<typename CharT>
-		constexpr std::basic_string_view<CharT> default_arg_template();
+		constexpr std::basic_string_view<CharT> default_arg_regex();
 
 		template<>
-		constexpr std::string_view default_arg_template<char>()
+		constexpr std::string_view default_arg_regex<char>()
 		{
 			return R"(\{\{([^\}]+)\}\})";
 		}
 
 		template<>
-		constexpr std::wstring_view default_arg_template<wchar_t>()
+		constexpr std::wstring_view default_arg_regex<wchar_t>()
 		{
 			return LR"(\{\{([^\}]+)\}\})";
 		}
@@ -51,8 +51,7 @@ namespace stpl
 	{
 		// char type
 		using char_t = CharT;
-		// type to store template string
-		using template_t = std::basic_string<char_t>;
+
 		// type to store argument value
 		using arg_value_t = std::basic_string<char_t>;
 
@@ -68,12 +67,13 @@ namespace stpl
 		template <typename V>
 		using match_allocator_t = std::allocator<V>;
 
-		constexpr static inline std::basic_string_view<char_t> default_arg_template = detail::default_arg_template<char_t>();
+		constexpr static inline std::basic_string_view<char_t> default_arg_regex = detail::default_arg_regex<char_t>();
+		constexpr static inline bool clear_args_on_parse_template = true;
 	};
 
-	struct default_arg_template_t {};
-	inline default_arg_template_t default_arg_template() { return {}; }
-	inline default_arg_template_t dat() { return {}; }
+	struct default_arg_regex_t {};
+	inline default_arg_regex_t default_arg_regex() { return {}; }
+	inline default_arg_regex_t dar() { return {}; }
 
 
 	template<class Traits>
@@ -84,7 +84,6 @@ namespace stpl
 		using string_view_t = std::basic_string_view<char_t>;
 		using string_t = std::basic_string<char_t>;
 		using basic_ostream_t = std::basic_ostream<char_t>;
-		using template_t = typename Traits::template_t;
 		using arg_value_t = typename Traits::arg_value_t;
 		using arg_store_value_t = std::variant<string_view_t, arg_value_t>;
 		using args_map_t = typename Traits::template args_map_t<string_view_t, arg_store_value_t>;
@@ -92,82 +91,113 @@ namespace stpl
 		using parts_vector_t = typename Traits::template parts_vector_t<part_t>;
 
 		using regex_t = std::basic_regex<char_t>;
-		using template_const_it_t = decltype(std::cbegin(template_t()));
-		using match_allocator_t = typename Traits::template match_allocator_t<std::sub_match<template_const_it_t>>;
-		using match_results_t = std::match_results<template_const_it_t, match_allocator_t>;
+		using match_const_it_t = typename string_view_t::const_iterator;
+		using match_allocator_t = typename Traits::template match_allocator_t<std::sub_match<match_const_it_t>>;
+		using match_results_t = std::match_results<match_const_it_t, match_allocator_t>;
 
-		constexpr static inline string_view_t default_arg_template = Traits::default_arg_template;
+		constexpr static inline string_view_t default_arg_regex = Traits::default_arg_regex;
+		constexpr static inline bool clear_args_on_parse_template = Traits::clear_args_on_parse_template;
 
-		basic_string_template(template_t template_, const regex_t& arg_template)
-			: m_template(std::move(template_))
-		{
-			match_results_t mr;
-			compile(arg_template, mr);
-		}
+		basic_string_template() = default;
 
-		basic_string_template(template_t template_, const regex_t& arg_template, const typename args_map_t::allocator_type& a_alloc, const typename parts_vector_t::allocator_type& p_alloc, const typename match_results_t::allocator_type& m_alloc)
-			: m_template(std::move(template_)),
-			m_args(a_alloc),
+		basic_string_template(const typename args_map_t::allocator_type& a_alloc, const typename parts_vector_t::allocator_type& p_alloc)
+			: m_args(a_alloc),
 			m_parts(p_alloc)
 		{
-			match_results_t mr(m_alloc);
-			compile(arg_template, mr);
 		}
 
 		template <class Alloc>
-		basic_string_template(template_t template_, const regex_t& arg_template, const Alloc& alloc)
-			: m_template(std::move(template_)),
-			m_args(alloc),
+		explicit basic_string_template(const Alloc& alloc)
+			: m_args(alloc),
 			m_parts(alloc)
 		{
-			match_results_t mr(alloc);
-			compile(arg_template, mr);
 		}
 
-		explicit basic_string_template(template_t template_, string_view_t arg_template = default_arg_template)
-			: m_template(std::move(template_))
+		void parse_template(string_view_t str_template)
 		{
-			match_results_t mr;
-			compile(regex_t(arg_template.data(), arg_template.length()), mr);
+			match_results_t match_results;
+			parse_template(str_template, regex_t(default_arg_regex.data(), default_arg_regex.length()), match_results);
 		}
 
-		basic_string_template(template_t template_, string_view_t arg_template, const typename args_map_t::allocator_type& a_alloc, const typename parts_vector_t::allocator_type& p_alloc, const typename match_results_t::allocator_type& m_alloc)
-			: m_template(std::move(template_)),
-			m_args(a_alloc),
-			m_parts(p_alloc)
+		void parse_template(string_view_t str_template, const typename match_results_t::allocator_type& alloc)
 		{
-			match_results_t mr(m_alloc);
-			compile(regex_t(arg_template.data(), arg_template.length()), mr);
+			match_results_t match_results(alloc);
+			parse_template(str_template, regex_t(default_arg_regex.data(), default_arg_regex.length()), match_results);
 		}
 
-		template <class Alloc>
-		basic_string_template(template_t template_, string_view_t arg_template, const Alloc& alloc)
-			: m_template(std::move(template_)),
-			m_args(alloc),
-			m_parts(alloc)
+		void parse_template(string_view_t str_template, match_results_t& match_results)
 		{
-			match_results_t mr(alloc);
-			compile(regex_t(arg_template.data(), arg_template.length()), mr);
+			parse_template(str_template, regex_t(default_arg_regex.data(), default_arg_regex.length()), match_results);
 		}
 
-
-		basic_string_template(template_t template_, const typename args_map_t::allocator_type& a_alloc, const typename parts_vector_t::allocator_type& p_alloc, const typename match_results_t::allocator_type& m_alloc)
-			: m_template(std::move(template_)),
-			m_args(a_alloc),
-			m_parts(p_alloc)
+		void parse_template(string_view_t str_template, string_view_t arg_regex)
 		{
-			match_results_t mr(m_alloc);
-			compile(regex_t(default_arg_template.data(), default_arg_template.length()), mr);
+			match_results_t match_results;
+			parse_template(str_template, regex_t(arg_regex.data(), arg_regex.length()), match_results);
 		}
 
-		template <class Alloc>
-		basic_string_template(template_t template_, default_arg_template_t, const Alloc& alloc)
-			: m_template(std::move(template_)),
-			m_args(alloc),
-			m_parts(alloc)
+		void parse_template(string_view_t str_template, string_view_t arg_regex, const typename match_results_t::allocator_type& alloc)
 		{
 			match_results_t mr(alloc);
-			compile(regex_t(default_arg_template.data(), default_arg_template.length()), mr);
+			parse_template(str_template, regex_t(arg_regex.data(), arg_regex.length()), mr);
+		}
+
+		void parse_template(string_view_t str_template, string_view_t arg_regex, match_results_t& match_results)
+		{
+			parse_template(str_template, regex_t(arg_regex.data(), arg_regex.length()), match_results);
+		}
+
+		void parse_template(string_view_t str_template, const regex_t& arg_regex)
+		{
+			match_results_t match_results;
+			parse_template(str_template, arg_regex, match_results);
+		}
+
+		void parse_template(string_view_t str_template, const regex_t& arg_regex, const typename match_results_t::allocator_type& alloc)
+		{
+			match_results_t mr(alloc);
+			parse_template(str_template, arg_regex, mr);
+		}
+
+		void parse_template(string_view_t str_template, const regex_t& arg_regex, match_results_t& match)
+		{
+			m_parts.clear();
+
+			if constexpr (clear_args_on_parse_template)
+				m_args.clear();
+
+			auto b = std::cbegin(str_template);
+			auto e = std::cend(str_template);
+
+			// search arguments using arg_template
+			while (std::regex_search(b, e, match, arg_regex))
+			{
+				// save unmatched prefix to m_parts
+				string_view_t prefix(&*match.prefix().first, match.prefix().length());
+				m_parts.push_back(prefix);
+
+				size_t i = 0;
+				if (match.size() == 2)
+					i = 1;
+
+				// save matched argument name to m_args
+				// by default argument value is a full argument name
+				string_view_t arg_name(&*match[i].first, match[i].length());
+				auto res = m_args.try_emplace(arg_name, std::in_place_index<0>, &*match[0].first, match[0].length());
+
+				// and save const ptr to argument value to m_parts
+				m_parts.push_back(&res.first->second);
+
+				// move to next un-searched symbol
+				b = match[0].second;
+			}
+
+			// save remaining symbols to m_parts
+			if (b != e)
+			{
+				string_view_t last_suffix(&*b, std::distance(b, e));
+				m_parts.push_back(last_suffix);
+			}
 		}
 
 		arg_value_t* get_arg(string_view_t key)
@@ -228,17 +258,37 @@ namespace stpl
 			}
 		}
 
-		const auto& args() const noexcept { return m_args; }
-
-		bool is_complete() const noexcept
+		template<typename Visitor>
+		void set_args_uninitialized_if(Visitor&& vis)
 		{
 			for (auto& [k, v] : m_args)
 			{
-				// argument value is a reference to argument name
+				if (v.index() == 0)
+				{
+					arg_value_t value;
+					if (std::invoke(std::forward<Visitor>(vis), k, value))
+						v.emplace<1>(std::move(value));
+				}
+			}
+		}
+
+		const auto& args() const noexcept { return m_args; }
+
+		bool is_args_complete() const noexcept
+		{
+			for (auto& [k, v] : m_args)
+			{
+				// argument value uninitialized (a reference to argument name)
 				if (v.index() == 0)
 					return false;
 			}
 			return true;
+		}
+
+		void clear()
+		{
+			m_parts.clear();
+			m_args.clear();
 		}
 
 		template <class Visitor>
@@ -288,49 +338,44 @@ namespace stpl
 		}
 
 	private:
-		void compile(const regex_t& arg_template, match_results_t& match)
-		{
-			auto b = std::cbegin(m_template);
-			auto e = std::cend(m_template);
-
-			// search arguments using arg_template
-			while (std::regex_search(b, e, match, arg_template))
-			{
-				// save unmatched prefix to m_parts
-				string_view_t prefix(&*match.prefix().first, match.prefix().length());
-				m_parts.push_back(prefix);
-
-				size_t i = 0;
-				if (match.size() == 2)
-					i = 1;
-
-				// save matched argument name to m_args
-				// by default argument value is a full argument name
-				string_view_t arg_name(&*match[i].first, match[i].length());
-				auto res = m_args.try_emplace(arg_name, std::in_place_index<0>, &*match[0].first, match[0].length());
-
-				// and save const ptr to argument value to m_parts
-				m_parts.push_back(&res.first->second);
-
-				// move to next un-searched symbol
-				b = match[0].second;
-			}
-
-			// save remaining symbols to m_parts
-			if (b != e)
-			{
-				string_view_t last_suffix(&*b, std::distance(b, e));
-				m_parts.push_back(last_suffix);
-			}
-		}
-
-		template_t m_template;
 		args_map_t m_args;
 		parts_vector_t m_parts;
 	};
 
 	using string_template = basic_string_template<string_template_traits<char>>;
 	using wstring_template = basic_string_template<string_template_traits<wchar_t>>;
+
+	template <class StringTemplate>
+	StringTemplate make_template(typename StringTemplate::string_view_t str_template)
+	{
+		StringTemplate st;
+		st.parse_template(str_template);
+		return st;
+	}
+
+	template <class StringTemplate>
+	StringTemplate make_template(typename StringTemplate::string_view_t str_template, typename StringTemplate::string_view_t arg_regex)
+	{
+		StringTemplate st;
+		st.parse_template(str_template, arg_regex);
+		return st;
+	}
+
+	template <class StringTemplate, class Alloc>
+	StringTemplate make_template(typename StringTemplate::string_view_t str_template, typename StringTemplate::string_view_t arg_regex, const Alloc& alloc)
+	{
+		StringTemplate st(alloc);
+		st.parse_template(str_template, arg_regex, alloc);
+		return st;
+	}
+
+	template <class StringTemplate, class Alloc>
+	StringTemplate make_template(typename StringTemplate::string_view_t str_template, default_arg_regex_t , const Alloc& alloc)
+	{
+		StringTemplate st(alloc);
+		st.parse_template(str_template, alloc);
+		return st;
+	}
 
 	namespace pmr
 	{

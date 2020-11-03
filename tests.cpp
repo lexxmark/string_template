@@ -21,24 +21,27 @@
 #include <sstream>
 #include <functional>
 
-#define EXPECT_M(a, b, s) do { if ((a) != (b)) throw std::logic_error(s); } while(false)
-#define EXPECT(a, b) EXPECT_M(a, b, "Test failed.")
+#define EXPECT_M(a, b, s, l) do { if ((a) != (b)) throw std::logic_error(std::string(s) + " At line " + std::to_string(l)); } while(false)
+#define EXPECT(a, b) EXPECT_M(a, b, "Test failed.", __LINE__)
 
 struct my_non_owning_traits : stpl::string_template_traits<char>
 {
-    using template_t = std::string_view;
     using arg_value_t = std::string_view;
 };
 
 struct my_pmr_non_owning_traits : stpl::pmr::pmr_string_template_traits<char>
 {
-    using template_t = std::string_view;
     using arg_value_t = std::string_view;
 };
 
 struct my_callback_traits : stpl::string_template_traits<char>
 {
     using arg_value_t = std::function<std::string_view()>;
+};
+
+struct my_reusable_traits : stpl::string_template_traits<char>
+{
+    constexpr static inline bool clear_args_on_parse_template = false;
 };
 
 int main()
@@ -49,7 +52,7 @@ int main()
     {
         // std::string version
         {
-            string_template st("Hello {{name}}!");
+            auto st = make_template<string_template>("Hello {{name}}!");
             st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -57,7 +60,7 @@ int main()
 
         // std::wstring version
         {
-            wstring_template st(L"Hello {{name}}!");
+            auto st = make_template<wstring_template>(L"Hello {{name}}!");
             st.set_arg(L"name", L"World");
             auto r = st.render();
             EXPECT(r, L"Hello World!");
@@ -65,7 +68,7 @@ int main()
 
         // get_arg
         {
-            string_template st("Hello {{name}}!");
+            auto st = make_template<string_template>("Hello {{name}}!");
             if (auto arg = st.get_arg("name"))
                 *arg = "World";
             auto r = st.render();
@@ -74,7 +77,7 @@ int main()
 
         // emplace_arg
         {
-            string_template st("Hello {{name}}!");
+            auto st = make_template<string_template>("Hello {{name}}!");
             st.emplace_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -82,7 +85,7 @@ int main()
 
         // custom argument template {name}->name
         {
-            string_template st("Hello {name}!", R"(\{([^\}]+)\})");
+            auto st = make_template<string_template>("Hello {name}!", R"(\{([^\}]+)\})");
             st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -90,7 +93,7 @@ int main()
 
         // custom argument template {name}->{name}
         {
-            string_template st("Hello {name}!", R"(\{[^\}]+\})");
+            auto st = make_template<string_template>("Hello {name}!", R"(\{[^\}]+\})");
             st.set_arg("{name}", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -101,7 +104,8 @@ int main()
             std::array<char, 1024> buff;
             std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
 
-            pmr::string_template st("Hello {{name}}!", &mem, &mem, &mem);
+            pmr::string_template st(&mem, &mem);
+            st.parse_template("Hello {{name}}!", &mem);
             st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -112,7 +116,7 @@ int main()
             std::array<char, 1024> buff;
             std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
 
-            pmr::string_template st("Hello {{name}}!", stpl::dat(), &mem);
+            auto st = make_template<pmr::string_template>("Hello {{name}}!", dar(), &mem);
             st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -120,7 +124,7 @@ int main()
 
         // empty
         {
-            string_template st("Hello World!");
+            auto st = make_template<string_template>("Hello World!");
             auto r = st.render();
             EXPECT(r, "Hello World!");
             EXPECT(st.args().empty(), true);
@@ -128,7 +132,7 @@ int main()
 
         // non-owning version
         {
-            basic_string_template<my_non_owning_traits> st("Hello {{name}}!");
+            auto st = make_template<basic_string_template<my_non_owning_traits>>("Hello {{name}}!");
             st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -139,7 +143,8 @@ int main()
             std::array<char, 1024> buff;
             std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
 
-            basic_string_template<my_pmr_non_owning_traits> st("Hello {{name}}!", &mem, &mem, &mem);
+            basic_string_template<my_pmr_non_owning_traits> st(&mem, &mem);
+            st.parse_template("Hello {{name}}!", &mem);
             st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -150,7 +155,7 @@ int main()
             std::array<char, 1024> buff;
             std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
 
-            basic_string_template<my_pmr_non_owning_traits> st("Hello {{name}}!", stpl::dat(), &mem);
+            auto st = make_template<basic_string_template<my_pmr_non_owning_traits>>("Hello {{name}}!", dar(), &mem);
             st.set_arg("name", "World");
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -158,7 +163,7 @@ int main()
 
         // multiple arguments
         {
-            string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+            auto st = make_template<string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_arg("name1", "World");
             st.set_arg("name2", "Space");
             auto r = st.render();
@@ -167,7 +172,7 @@ int main()
 
         // multiple arguments using visitor
         {
-            string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+            auto st = make_template<string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_args([](auto& name, auto& value) {
                 if (name == "name1")
                     value = "World";
@@ -180,7 +185,7 @@ int main()
 
         // stream version
         {
-            string_template st("Hello {{name}}!");
+            auto st = make_template<string_template>("Hello {{name}}!");
             st.set_arg("name", "World");
 
             std::stringstream str;
@@ -191,7 +196,8 @@ int main()
         // argument values as callbacks
         {
             using namespace std::literals;
-            basic_string_template<my_callback_traits> st("Hello {{name}}!");
+            auto st = make_template<basic_string_template<my_callback_traits>>("Hello {{name}}!");
+            st.parse_template("Hello {{name}}!");
             st.set_arg("name", [] { return "World"sv; });
             auto r = st.render();
             EXPECT(r, "Hello World!");
@@ -199,7 +205,7 @@ int main()
 
         // partial arguments
         {
-            string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+            auto st = make_template<string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_arg("name2", "Space");
             auto r = st.render();
             EXPECT(r, "Hello {{name1}}! Hello Space! Hello {{name1}}!");
@@ -207,7 +213,7 @@ int main()
 
         // partial arguments using visitor 
         {
-            string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+            auto st = make_template<string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
             st.set_args_if([](auto& name, auto& value) {
                 if (name == "name2")
                 {
@@ -218,6 +224,18 @@ int main()
             });
             auto r = st.render();
             EXPECT(r, "Hello {{name1}}! Hello Space! Hello {{name1}}!");
+        }
+
+        // multiple templates for the same args
+        {
+            auto st = make_template<basic_string_template<my_reusable_traits>>("Hello {{name}}!");
+            st.set_arg("name", "World");
+            auto r = st.render();
+            EXPECT(r, "Hello World!");
+
+            st.parse_template("Bye {{name}}!");
+            r = st.render();
+            EXPECT(r, "Bye World!");
         }
     }
     catch (const std::logic_error& e)

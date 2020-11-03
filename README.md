@@ -4,7 +4,7 @@ This is one header library defines *basic_string_template* template class with *
 
 Simple use:
 ```
-	stpl::string_template st("Hello {{name}}!");
+	auto st = stpl::make_template<stpl::string_template>("Hello {{name}}!");
 	st.set_arg("name", "World");
 	auto r = st.render();
 	EXPECT(r, "Hello World!");
@@ -12,7 +12,7 @@ Simple use:
 
 User can define custom argument regexp to use different argument wrapping. In the example below arguments will be captured by single *{...}* braces:
 ```
-	stpl::string_template st("Hello {name}!", R"(\{([^\}]+)\})");
+	auto st = stpl::make_template<stpl::string_template>("Hello {name}!", R"(\{([^\}]+)\})");
 	st.set_arg("name", "World");
 	auto r = st.render();
 	EXPECT(r, "Hello World!");
@@ -23,7 +23,8 @@ There is a polymorphic version available. User can supply different allocators f
 	std::array<char, 1024> buff;
 	std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
 
-	stpl::pmr::string_template st("Hello {{name}}!", &mem, &mem, &mem);
+	stpl::pmr::string_template st(&mem, &mem);
+	st.parse_template("Hello {{name}}!", &mem);
 	st.set_arg("name", "World");
 	auto r = st.render();
 	EXPECT(r, "Hello World!");
@@ -34,7 +35,7 @@ Or single allocator can be used:
 	std::array<char, 1024> buff;
 	std::pmr::monotonic_buffer_resource mem(buff.data(), buff.size(), std::pmr::null_memory_resource());
 
-	stpl::pmr::string_template st("Hello {{name}}!", stpl::default_arg_template(), &mem);
+	auto st = stpl::make_template<stpl::pmr::string_template>("Hello {{name}}!", stpl::default_arg_template(), &mem);
 	st.set_arg("name", "World");
 	auto r = st.render();
 	EXPECT(r, "Hello World!");
@@ -42,7 +43,7 @@ Or single allocator can be used:
 
 It's possible to supply a visitor to process all arguments:
 ```
-	string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+	auto st = stpl::make_template<stpl::string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
 	st.set_args([](auto& name, auto& value) {
 		if (name == "name1")
 			value = "World";
@@ -55,7 +56,7 @@ It's possible to supply a visitor to process all arguments:
 
 Arguments with uninitialized values remain unchanged:
 ```
-	string_template st("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
+	auto st = stpl::make_template<stpl::string_template>("Hello {{name1}}! Hello {{name2}}! Hello {{name1}}!");
 	st.set_arg("name2", "Space");
 	auto r = st.render();
 	EXPECT(r, "Hello {{name1}}! Hello Space! Hello {{name1}}!");
@@ -63,7 +64,7 @@ Arguments with uninitialized values remain unchanged:
 
 There is a stream version of the *render* function:
 ```
-	string_template st("Hello {{name}}!");
+	auto st = stpl::make_template<stpl::string_template>("Hello {{name}}!");
 	st.set_arg("name", "World");
 
 	std::stringstream str;
@@ -71,7 +72,7 @@ There is a stream version of the *render* function:
 	EXPECT(str.str(), "Hello World!");
 ```
 
-User can use functions for argument values:
+User can use functors for argument values:
 ```
 	struct my_callback_traits : stpl::string_template_traits<char>
 	{
@@ -79,7 +80,7 @@ User can use functions for argument values:
 	};
 
 	using namespace std::literals;
-	basic_string_template<my_callback_traits> st("Hello {{name}}!");
+	auto st = stpl::make_template<stpl::basic_string_template<my_callback_traits>>("Hello {{name}}!");
 	st.set_arg("name", [] { return "World"sv; });
 	auto r = st.render();
 	EXPECT(r, "Hello World!");
