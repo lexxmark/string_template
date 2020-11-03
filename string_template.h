@@ -16,8 +16,8 @@
 
 #pragma once
 
-#ifndef STRING_TEMPLATE_H
-#define STRING_TEMPLATE_H
+#ifndef STPL_STRING_TEMPLATE_H
+#define STPL_STRING_TEMPLATE_H
 
 #include <string>
 #include <string_view>
@@ -71,10 +71,9 @@ namespace stpl
 		constexpr static inline std::basic_string_view<char_t> default_arg_template = detail::default_arg_template<char_t>();
 	};
 
-	struct default_arg_template_t
-	{};
-	default_arg_template_t default_arg_template() { return {}; }
-	default_arg_template_t dat() { return {}; }
+	struct default_arg_template_t {};
+	inline default_arg_template_t default_arg_template() { return {}; }
+	inline default_arg_template_t dat() { return {}; }
 
 
 	template<class Traits>
@@ -208,55 +207,72 @@ namespace stpl
 		}
 
 		template<typename Visitor>
-		void set_args(const Visitor vis)
+		void set_args(Visitor&& vis)
 		{
 			for (auto& [k, v] : m_args)
 			{
 				if (v.index() == 0)
 					v.emplace<1>();
-				vis(k, std::get<1>(v));
+				std::invoke(std::forward<Visitor>(vis), k, std::get<1>(v));
 			}
 		}
 
 		template<typename Visitor>
-		void set_args_if(const Visitor vis)
+		void set_args_if(Visitor&& vis)
 		{
 			for (auto& [k, v] : m_args)
 			{
 				arg_value_t value;
-				if (vis(k, value))
+				if (std::invoke(std::forward<Visitor>(vis), k, value))
 					v.emplace<1>(std::move(value));
 			}
 		}
 
 		const auto& args() const noexcept { return m_args; }
 
-		void render(string_t& result) const
+		bool is_complete() const noexcept
+		{
+			for (auto& [k, v] : m_args)
+			{
+				// argument value is a reference to argument name
+				if (v.index() == 0)
+					return false;
+			}
+			return true;
+		}
+
+		template <class Visitor>
+		void render_to(Visitor&& vis) const
 		{
 			for (const auto& p : m_parts)
 			{
 				// if part is a piece of template
 				if (p.index() == 0)
-					result += std::get<0>(p);
+					std::invoke(std::forward<Visitor>(vis), std::get<0>(p));
 				else
 				{
 					// part is argument value or piece of template
 					const auto& arg_value = *std::get<1>(p);
 					// if argument value uninitialized -> get piece of template
 					if (arg_value.index() == 0)
-						result += std::get<0>(arg_value);
+						std::invoke(std::forward<Visitor>(vis), std::get<0>(arg_value));
 					else
 					{
 						// argument value is initialized
 						// if argument value is callable -> invoke with no arguments
 						if constexpr (std::is_invocable_v<arg_value_t>)
-							result += std::get<1>(arg_value)();
+							std::invoke(std::forward<Visitor>(vis), std::get<1>(arg_value)());
 						else
 							// argument value is orginary value
-							result += std::get<1>(arg_value);
+							std::invoke(std::forward<Visitor>(vis), std::get<1>(arg_value));
 					}
 				}
 			}
+		}
+
+		void render(string_t& result) const
+		{
+			render_to([&result](const auto& part) { result += part; });
 		}
 
 		string_t render() const
@@ -268,30 +284,7 @@ namespace stpl
 
 		void render(basic_ostream_t& out) const
 		{
-			for (const auto& p : m_parts)
-			{
-				// if part is a piece of template
-				if (p.index() == 0)
-					out << std::get<0>(p);
-				else
-				{
-					// part is argument value or piece of template
-					const auto& arg_value = *std::get<1>(p);
-					// if argument value uninitialized -> get piece of template
-					if (arg_value.index() == 0)
-						out << std::get<0>(arg_value);
-					else
-					{
-						// argument value is initialized
-						// if argument value is callable -> invoke with no arguments
-						if constexpr (std::is_invocable_v<arg_value_t>)
-							out << std::get<1>(arg_value)();
-						else
-							// argument value is orginary value
-							out << std::get<1>(arg_value);
-					}
-				}
-			}
+			render_to([&out](const auto& part) { out << part; });
 		}
 
 	private:
@@ -359,7 +352,8 @@ namespace stpl
 
 		using string_template = basic_string_template<pmr_string_template_traits<char>>;
 		using wstring_template = basic_string_template<pmr_string_template_traits<wchar_t>>;
-	}
-}
 
-#endif
+	} // end namespace pmr
+} // end namespace stpl
+
+#endif //STPL_STRING_TEMPLATE_H
