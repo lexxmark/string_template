@@ -86,6 +86,6 @@ User can use functors for argument values:
 	EXPECT(r, "Hello World!");
 ```
 
-More usage examples see in tests.cpp file.
+More examples see in tests.cpp file.
 
 Tested in VS C++ 2019.
