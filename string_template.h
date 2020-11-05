@@ -100,6 +100,20 @@ namespace stpl
 
 		basic_string_template() = default;
 
+		basic_string_template(basic_string_template&& other) noexcept
+			: m_args(std::move(other.m_args)),
+			m_parts(std::move(other.m_parts))
+		{}
+		basic_string_template& operator=(basic_string_template&& other) noexcept
+		{
+			m_args = std::move(other.m_args);
+			m_parts = std::move(other.m_parts);
+			return *this;
+		}
+
+		basic_string_template(const basic_string_template&) = delete;
+		basic_string_template& operator=(const basic_string_template&) = delete;
+
 		basic_string_template(const typename args_map_t::allocator_type& a_alloc, const typename parts_vector_t::allocator_type& p_alloc)
 			: m_args(a_alloc),
 			m_parts(p_alloc)
@@ -285,10 +299,16 @@ namespace stpl
 			return true;
 		}
 
-		void clear()
+		void clear() noexcept
 		{
 			m_parts.clear();
 			m_args.clear();
+		}
+
+		void swap(basic_string_template& other) noexcept
+		{
+			std::swap(m_args, other.m_args);
+			std::swap(m_parts, other.m_parts);
 		}
 
 		template <class Visitor>

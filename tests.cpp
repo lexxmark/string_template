@@ -237,6 +237,26 @@ int main()
             r = st.render();
             EXPECT(r, "Bye World!");
         }
+
+        // vertor of templates
+        {
+            std::vector<string_template> templates;
+
+            {
+                auto st = make_template("Hello {{name}}!");
+                st.set_arg("name", "World");
+                templates.push_back(std::move(st));
+            }
+
+            {
+                auto st = make_template("Bye {{name}}!");
+                st.set_arg("name", "Space");
+                templates.push_back(std::move(st));
+            }
+
+            EXPECT(templates[0].render(), "Hello World!");
+            EXPECT(templates[1].render(), "Bye Space!");
+        }
     }
     catch (const std::logic_error& e)
     {
